@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rubik Solver — Nhập màu & xem cách giải khối Rubik 3x3 online</title>
+  <meta name="description" content="Giải khối Rubik 3x3 online. Nhập màu trên mô hình 3D tương tác, chọn cách giải (Kociemba hoặc từng tầng), xem lời giải từng bước. Dùng ngay, không cần cài đặt." />
+  <meta name="keywords" content="rubik, solver, giải rubik, khối rubik, rubik 3x3, kociemba, lớp-lớp, tầng-tầng, online tool" />
+  <meta name="author" content="Rubik Solver" />
+  <meta name="theme-color" content="#0e1116" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="shortcut icon" href="favicon.svg" />
+  <link rel="apple-touch-icon" href="favicon.svg" />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://rubik.js-tools.org/" />
+  <meta property="og:title" content="Rubik Solver — Giải khối Rubik 3x3 online" />
+  <meta property="og:description" content="Nhập màu khối Rubik trên mô hình 3D, xem cách giải từng bước. Hỗ trợ 2 phương pháp: Kociemba (nhanh) & Người mới (chi tiết)." />
+  <meta property="og:image" content="https://rubik.js-tools.org/og-image.svg" />
+  <meta property="og:locale" content="vi_VN" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://rubik.js-tools.org/" />
+  <meta name="twitter:title" content="Rubik Solver — Giải khối Rubik 3x3 online" />
+  <meta name="twitter:description" content="Nhập màu khối Rubik, xem cách giải từng bước. Thuật toán Kociemba hoặc phương pháp tầng-by-tầng." />
+  <meta name="twitter:image" content="https://rubik.js-tools.org/og-image.svg" />
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://rubik.js-tools.org/" />
+
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Rubik Solver",
+    "description": "Công cụ giải khối Rubik 3x3 online với mô hình 3D tương tác",
+    "url": "https://rubik.js-tools.org/",
+    "applicationCategory": "UtilitiesApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "Rubik Solver"
+    },
+    "inLanguage": "vi-VN",
+    "browserRequirements": "Requires JavaScript"
+  }
+  </script>
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <h1 class="top-bar-title">🧩 Rubik Solver</h1>
+    </div>
+    <div class="top-bar-right">
+      <a href="https://js-tools.org/" target="_blank" rel="noopener" class="top-bar-link">Other apps <svg style="width: 14px; height: 14px; vertical-align: -2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+      <a href="https://js-tools.org/donate" target="_blank" rel="noopener" class="top-bar-donate">♥ Donate</a>
+    </div>
+  </header>
+
+  <p class="tagline tagline-container">Nhập màu từng ô như khối thật → xem cách giải từng bước hoặc giải nhanh</p>
+
+  <main class="layout">
+    <!-- Khối 3D -->
+    <section class="stage">
+      <div id="cube3d" class="cube3d"></div>
+      <div class="stage-hint">
+        Kéo để xoay khối · <span id="modeHint">Chạm vào ô để tô màu đang chọn</span>
+      </div>
+    </section>
+
+    <!-- Bảng điều khiển -->
+    <aside class="panel">
+      <!-- Khung nhập màu -->
+      <div id="inputPanel" class="card">
+        <h2>1 · Nhập màu</h2>
+        <p class="muted">Chọn một màu rồi chạm vào các ô trên khối. Ô tâm (giữa) đã cố định.</p>
+        <div id="palette" class="palette"></div>
+        <div class="btn-row">
+          <button id="btnSolved" class="btn ghost">Mẫu đã giải</button>
+          <button id="btnScramble" class="btn ghost">Trộn ngẫu nhiên</button>
+          <button id="btnClear" class="btn ghost">Xoá hết</button>
+        </div>
+
+        <h2 style="margin-top:18px">2 · Cách giải</h2>
+        <div class="method">
+          <label class="radio">
+            <input type="radio" name="method" value="kociemba" checked />
+            <span><b>Nhanh / ngắn gọn</b><small>Thuật toán Kociemba (~20 nước)</small></span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="method" value="lbl" />
+            <span><b>Người mới (từng tầng)</b><small>Có tên từng giai đoạn, dễ học</small></span>
+          </label>
+        </div>
+        <button id="btnSolve" class="btn primary big">Giải khối này ▶</button>
+        <div id="msg" class="msg"></div>
+      </div>
+
+      <!-- Khung phát lại -->
+      <div id="playPanel" class="card hidden">
+        <div class="play-head">
+          <h2>Lời giải</h2>
+          <button id="btnEdit" class="btn ghost small">← Sửa màu</button>
+        </div>
+        <div id="solveInfo" class="muted"></div>
+
+        <div class="player">
+          <div class="counter"><span id="moveCounter">0 / 0</span></div>
+          <div class="stage-label" id="stageLabel"></div>
+          <div class="controls">
+            <button id="btnFirst" class="ctrl" title="Về đầu">⏮</button>
+            <button id="btnPrev" class="ctrl" title="Lùi">◀</button>
+            <button id="btnPlay" class="ctrl play" title="Chạy/Dừng">▶</button>
+            <button id="btnNext" class="ctrl" title="Tiến">▶|</button>
+            <button id="btnLast" class="ctrl" title="Tới cuối">⏭</button>
+          </div>
+          <div class="speed">
+            <span>Tốc độ</span>
+            <input id="speed" type="range" min="1" max="10" value="5" />
+            <button id="btnFast" class="btn ghost small">Giải nhanh ⏩</button>
+          </div>
+        </div>
+
+        <div class="moves-title">Toàn bộ các bước</div>
+        <div id="movesList" class="moves"></div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/cube.js"></script>
+  <script src="vendor/solve.js"></script>
+  <script src="js/cube.js"></script>
+  <script src="js/solver-lbl.js"></script>
+  <script src="js/render3d.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

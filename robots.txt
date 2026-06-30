@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /css/
+Allow: /js/
+Allow: /vendor/
+
+Disallow: /.claude/
+Disallow: /.git/
+
+Sitemap: https://rubik.js-tools.org/sitemap.xml

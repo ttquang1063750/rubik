@@ -1,0 +1,29 @@
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node (if used later)
+node_modules/
+package-lock.json
+yarn.lock
+.pnp
+
+# Build & Dist
+dist/
+build/
+*.log
+
+# Claude Code
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temp
+*.tmp
+.tmp/

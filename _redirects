@@ -1,0 +1,8 @@
+# Redirect HTTP to HTTPS (handled by Cloudflare)
+# Redirect www to non-www (optional, configure in Cloudflare)
+
+# Redirect old URLs (if any)
+# /old-path  /new-path  301
+
+# Default: SPA fallback (not needed for static site)
+# /*  /index.html  200
