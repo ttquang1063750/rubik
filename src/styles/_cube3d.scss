@@ -1,0 +1,29 @@
+@use 'base' as *;
+
+// Khối 3D
+.stage {
+  background: linear-gradient(180deg, #11161d, #0c1015);
+  @include bordered(var(--radius));
+  overflow: hidden;
+  position: sticky;
+  top: 16px;
+}
+
+.cube3d {
+  width: 100%;
+  height: 480px;
+  touch-action: none;
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.stage-hint {
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}

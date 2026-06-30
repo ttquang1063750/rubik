@@ -17,6 +17,9 @@ dist/
 build/
 *.log
 
+# Test coverage
+coverage/
+
 # Claude Code
 .claude/
 

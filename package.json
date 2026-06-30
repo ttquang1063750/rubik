@@ -1,0 +1,27 @@
+{
+  "name": "rubik-solver",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Giải khối Rubik 3x3 online — nhập màu trên mô hình 3D, xem cách giải từng bước",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "three": "0.160.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.160.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "sass": "^1.79.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0"
+  }
+}

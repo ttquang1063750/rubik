@@ -1,0 +1,98 @@
+@use 'base' as *;
+
+// Panel
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  background: var(--card);
+  @include bordered(var(--radius));
+  padding: 18px;
+
+  h2 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+  }
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 12px;
+}
+.hidden {
+  display: none !important;
+}
+
+// Palette
+.palette {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.swatch {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 3px solid transparent;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.08s;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+  &.active {
+    border-color: var(--text);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+}
+
+// Method
+.method {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.radio {
+  @include flex-row($gap: 10px);
+  @include bordered;
+  padding: 10px 12px;
+  cursor: pointer;
+
+  &:has(input:checked) {
+    border-color: var(--accent);
+    background: #1a2535;
+  }
+  span {
+    display: flex;
+    flex-direction: column;
+  }
+  small {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  input {
+    accent-color: var(--accent);
+  }
+}
+
+.msg {
+  margin-top: 12px;
+  font-size: 13px;
+  min-height: 18px;
+
+  &.err {
+    color: #ff7b72;
+  }
+  &.ok {
+    color: #56d364;
+  }
+  &.info {
+    color: var(--accent);
+  }
+}
