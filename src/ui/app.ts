@@ -6,21 +6,12 @@ import { Cube } from '../core/cube';
 import { solveLBL } from '../core/solver-lbl';
 import { RubikRenderer, assertFaceletState } from './renderer';
 import type { DisplayState } from './renderer';
-import type { Face, FaceletState, Move, SolveStage } from '../core/types';
+import type { Face, FaceletState, Move, SolveStage, StageKey } from '../core/types';
+import { colorLabel, getLang, isI18nKey, setLang, stageLabel, t } from './i18n';
+import type { Lang } from './i18n';
 
 // ---- bảng màu: thứ tự đẹp mắt, kèm ký tự mặt ----
-interface PaletteEntry {
-  readonly letter: Face;
-  readonly name: string;
-}
-const PALETTE: readonly PaletteEntry[] = [
-  { letter: 'U', name: 'Trắng' },
-  { letter: 'D', name: 'Vàng' },
-  { letter: 'F', name: 'Xanh lá' },
-  { letter: 'B', name: 'Xanh dương' },
-  { letter: 'R', name: 'Đỏ' },
-  { letter: 'L', name: 'Cam' }
-];
+const PALETTE: readonly Face[] = ['U', 'D', 'F', 'B', 'R', 'L'];
 const CENTERS: readonly number[] = [4, 13, 22, 31, 40, 49];
 
 // ---- trạng thái ----
@@ -34,7 +25,7 @@ let stages: readonly SolveStage[] = [];
 let allMoves: readonly Move[] = [];
 let baseState: FaceletState | null = null;
 interface StageBound {
-  readonly name: string;
+  readonly name: StageKey;
   readonly start: number;
   readonly end: number;
 }
@@ -73,22 +64,54 @@ function init(): void {
   };
   buildPalette();
   bindButtons();
+  applyTranslations();
 }
 
 function buildPalette(): void {
   const pal = $('palette');
-  for (const p of PALETTE) {
+  pal.innerHTML = '';
+  for (const letter of PALETTE) {
     const sw = document.createElement('div');
-    sw.className = 'swatch' + (p.letter === selected ? ' active' : '');
-    sw.style.background = RubikRenderer.COLORS[p.letter];
-    sw.title = p.name;
+    sw.className = 'swatch' + (letter === selected ? ' active' : '');
+    sw.style.background = RubikRenderer.COLORS[letter];
+    sw.title = colorLabel(letter);
     sw.onclick = () => {
-      selected = p.letter;
+      selected = letter;
       Array.from(pal.children).forEach((c) => c.classList.remove('active'));
       sw.classList.add('active');
     };
     pal.appendChild(sw);
   }
+}
+
+// ================= đa ngôn ngữ =================
+
+function applyTranslations(): void {
+  document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+    const key = el.dataset.i18n;
+    if (key && isI18nKey(key)) el.textContent = t(key);
+  });
+  document.querySelectorAll<HTMLElement>('[data-i18n-title]').forEach((el) => {
+    const key = el.dataset.i18nTitle;
+    if (key && isI18nKey(key)) el.title = t(key);
+  });
+  $('btnLang').textContent = getLang() === 'vi' ? 'EN' : 'VI';
+  updateModeHint();
+  if (stages.length > 0) {
+    updateSolveInfo();
+    renderMovesList();
+    updateUI();
+  }
+}
+
+function updateModeHint(): void {
+  $('modeHint').textContent = inputMode ? t('modeHint.color') : t('modeHint.playback');
+}
+
+function switchLang(lang: Lang): void {
+  setLang(lang);
+  buildPalette();
+  applyTranslations();
 }
 
 function bindButtons(): void {
@@ -97,12 +120,12 @@ function bindButtons(): void {
     const s: DisplayState = new Array(54).fill('.');
     (['U', 'R', 'F', 'D', 'L', 'B'] as const).forEach((f, k) => { s[CENTERS[k]] = f; });
     setState(s);
-    msg('Đã xoá. Hãy tô lại các ô theo khối của bạn.', 'info');
+    msg(t('msg.cleared'), 'info');
   };
   $('btnScramble').onclick = () => {
     const seq = randomScramble(25);
     setState(Cube.solved().apply(seq).state);
-    msg('Đã trộn ngẫu nhiên 25 nước.', 'info');
+    msg(t('msg.scrambled'), 'info');
   };
   $('btnSolve').onclick = onSolve;
   $('btnEdit').onclick = backToEdit;
@@ -113,6 +136,8 @@ function bindButtons(): void {
   $('btnNext').onclick = () => { stopPlay(); stepNext(); };
   $('btnPlay').onclick = () => { if (playing) stopPlay(); else startPlay(); };
   $('btnFast').onclick = () => { startPlay(true); };
+  $('btnLang').onclick = () => { switchLang(getLang() === 'vi' ? 'en' : 'vi'); };
+  $('btnHelp').onclick = () => { $('helpPanel').classList.toggle('hidden'); };
 
   const speedInput = $input('speed');
   speedInput.oninput = () => {
@@ -175,25 +200,25 @@ function validate(facelet: string): ValidationResult {
     counts[ch] = (counts[ch] ?? 0) + 1;
   }
   const emptyCount = counts['.'] ?? 0;
-  if (emptyCount > 0) return { ok: false, error: `Còn ${emptyCount} ô chưa tô màu.` };
+  if (emptyCount > 0) return { ok: false, error: t('err.emptyTilesTpl', emptyCount) };
 
   const faces: readonly Face[] = ['U', 'R', 'F', 'D', 'L', 'B'];
   const bad = faces.filter((f) => counts[f] !== 9);
-  if (bad.length > 0) return { ok: false, error: `Mỗi màu phải đúng 9 ô. Sai ở: ${bad.join(', ')}.` };
+  if (bad.length > 0) return { ok: false, error: t('err.wrongCountTpl', bad.join(', ')) };
 
   try {
     const c = window.Cube.fromString(facelet);
     if (!isPermutation(c.cp, 8) || !isPermutation(c.ep, 12)) {
-      return { ok: false, error: 'Có quân bị trùng/thiếu — kiểm tra lại màu.' };
+      return { ok: false, error: t('err.duplicateMissing') };
     }
     const coSum = c.co.reduce((a, b) => a + b, 0);
     const eoSum = c.eo.reduce((a, b) => a + b, 0);
-    if (coSum % 3 !== 0) return { ok: false, error: 'Một góc bị xoay sai hướng (không thể có thật).' };
-    if (eoSum % 2 !== 0) return { ok: false, error: 'Một cạnh bị lật sai hướng (không thể có thật).' };
-    if (parity(c.cp) !== parity(c.ep)) return { ok: false, error: 'Trạng thái không thể giải (sai 2 quân).' };
+    if (coSum % 3 !== 0) return { ok: false, error: t('err.cornerTwist') };
+    if (eoSum % 2 !== 0) return { ok: false, error: t('err.edgeFlip') };
+    if (parity(c.cp) !== parity(c.ep)) return { ok: false, error: t('err.parity') };
     return { ok: true };
   } catch {
-    return { ok: false, error: 'Màu không hợp lệ — kiểm tra lại.' };
+    return { ok: false, error: t('err.invalidColors') };
   }
 }
 
@@ -212,38 +237,38 @@ function onSolve(): void {
   const method = selectedMethod();
 
   if (method === 'kociemba') {
-    msg('⏳ Đang chuẩn bị bộ giải nhanh…', 'info');
+    msg(t('msg.preparingSolver'), 'info');
     // initSolver nặng -> chạy sau 1 nhịp để UI kịp hiện thông báo
     setTimeout(() => {
       try {
         if (!solverReady) { window.Cube.initSolver(); solverReady = true; }
         const sol = window.Cube.fromString(facelet).solve();
         const moves = Cube.simplify(sol);
-        startPlayback(
-          [{ name: 'Lời giải tối ưu (Kociemba)', moves }],
-          moves,
-          `${moves.length} nước · thuật toán Kociemba`
-        );
+        startPlayback([{ name: 'kociembaOptimal', moves }], moves, 'kociemba');
       } catch (e) {
-        msg('Không giải được: ' + errorMessage(e), 'err');
+        msg(t('msg.solveFailedPrefix') + errorMessage(e), 'err');
       }
     }, 30);
   } else {
     try {
       const res = solveLBL(assertFaceletState(state));
-      if (!res.solved) { msg('Lỗi nội bộ khi giải tầng-by-tầng.', 'err'); return; }
-      startPlayback(res.stages, res.moves, `${res.moves.length} nước · ${res.stages.length} giai đoạn`);
+      if (!res.solved) { msg(t('msg.lblInternalError'), 'err'); return; }
+      startPlayback(res.stages, res.moves, 'lbl');
     } catch (e) {
-      msg('Không giải được: ' + errorMessage(e), 'err');
+      msg(t('msg.solveFailedPrefix') + errorMessage(e), 'err');
     }
   }
 }
 
 // ================= phát lại =================
 
-function startPlayback(stg: readonly SolveStage[], moves: readonly Move[], info: string): void {
+type SolveMethod = 'kociemba' | 'lbl';
+let lastSolveMethod: SolveMethod | null = null;
+
+function startPlayback(stg: readonly SolveStage[], moves: readonly Move[], method: SolveMethod): void {
   stages = stg;
   allMoves = moves;
+  lastSolveMethod = method;
   baseState = assertFaceletState(state);
   idx = 0;
 
@@ -258,11 +283,18 @@ function startPlayback(stg: readonly SolveStage[], moves: readonly Move[], info:
   renderer.pickEnabled = false;
   $('inputPanel').classList.add('hidden');
   $('playPanel').classList.remove('hidden');
-  $('solveInfo').textContent = info;
-  $('modeHint').textContent = 'Đang xem lời giải';
+  updateSolveInfo();
+  updateModeHint();
   renderMovesList();
   seek(0);
   msg('', '');
+}
+
+function updateSolveInfo(): void {
+  if (!lastSolveMethod) return;
+  $('solveInfo').textContent = lastSolveMethod === 'kociemba'
+    ? t('solveInfo.kociembaTpl', allMoves.length)
+    : t('solveInfo.lblTpl', allMoves.length, stages.length);
 }
 
 function backToEdit(): void {
@@ -272,7 +304,7 @@ function backToEdit(): void {
   renderer.setState(state); // giữ nguyên màu đã nhập
   $('playPanel').classList.add('hidden');
   $('inputPanel').classList.remove('hidden');
-  $('modeHint').textContent = 'Chạm vào ô để tô màu đang chọn';
+  updateModeHint();
   msg('', '');
 }
 
@@ -286,7 +318,7 @@ function renderMovesList(): void {
     if (stages.length > 1) {
       const name = document.createElement('div');
       name.className = 'gname';
-      name.textContent = `${si + 1}. ${s.name} (${s.moves.length})`;
+      name.textContent = `${si + 1}. ${stageLabel(s.name)} (${s.moves.length})`;
       group.appendChild(name);
     }
     const chips = document.createElement('div');
@@ -311,9 +343,9 @@ function updateUI(): void {
   // giai đoạn hiện tại: tìm giai đoạn chứa nước sắp đi (idx)
   let label = '';
   for (const b of stageBounds) {
-    if (idx >= b.start && idx < b.end) { label = b.name; break; }
+    if (idx >= b.start && idx < b.end) { label = stageLabel(b.name); break; }
   }
-  if (idx >= allMoves.length && allMoves.length > 0) label = '✅ Đã giải xong!';
+  if (idx >= allMoves.length && allMoves.length > 0) label = t('msg.solvedDone');
   $('stageLabel').textContent = label;
   $('btnPlay').textContent = playing ? '⏸' : '▶';
   const chips = $('movesList').querySelectorAll<HTMLElement>('.chip');

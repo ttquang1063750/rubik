@@ -63,19 +63,20 @@
       <h1 class="top-bar-title">🧩 Rubik Solver</h1>
     </div>
     <div class="top-bar-right">
-      <a href="https://js-tools.org/" target="_blank" rel="noopener" class="top-bar-link">Other apps <svg style="width: 14px; height: 14px; vertical-align: -2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
-      <a href="https://js-tools.org/donate" target="_blank" rel="noopener" class="top-bar-donate">♥ Donate</a>
+      <a href="https://js-tools.org/" target="_blank" rel="noopener" class="top-bar-link"><span data-i18n="topBar.otherApps">Other apps</span> <svg style="width: 14px; height: 14px; vertical-align: -2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
+      <a href="https://js-tools.org/donate" target="_blank" rel="noopener" class="top-bar-donate" data-i18n="topBar.donate">♥ Donate</a>
+      <button id="btnLang" type="button" class="top-bar-lang">EN</button>
     </div>
   </header>
 
-  <p class="tagline tagline-container">Nhập màu từng ô như khối thật → xem cách giải từng bước hoặc giải nhanh</p>
+  <p class="tagline tagline-container" data-i18n="tagline">Nhập màu từng ô như khối thật → xem cách giải từng bước hoặc giải nhanh</p>
 
   <main class="layout">
     <!-- Khối 3D -->
     <section class="stage">
       <div id="cube3d" class="cube3d"></div>
       <div class="stage-hint">
-        Kéo để xoay khối · <span id="modeHint">Chạm vào ô để tô màu đang chọn</span>
+        <span data-i18n="stageHintPrefix">Kéo để xoay khối · </span><span id="modeHint">Chạm vào ô để tô màu đang chọn</span>
       </div>
     </section>
 
@@ -83,35 +84,35 @@
     <aside class="panel">
       <!-- Khung nhập màu -->
       <div id="inputPanel" class="card">
-        <h2>1 · Nhập màu</h2>
-        <p class="muted">Chọn một màu rồi chạm vào các ô trên khối. Ô tâm (giữa) đã cố định.</p>
+        <h2 data-i18n="inputPanel.heading">1 · Nhập màu</h2>
+        <p class="muted" data-i18n="inputPanel.desc">Chọn một màu rồi chạm vào các ô trên khối. Ô tâm (giữa) đã cố định.</p>
         <div id="palette" class="palette"></div>
         <div class="btn-row">
-          <button id="btnSolved" class="btn ghost">Mẫu đã giải</button>
-          <button id="btnScramble" class="btn ghost">Trộn ngẫu nhiên</button>
-          <button id="btnClear" class="btn ghost">Xoá hết</button>
+          <button id="btnSolved" class="btn ghost" data-i18n="btn.solved">Mẫu đã giải</button>
+          <button id="btnScramble" class="btn ghost" data-i18n="btn.scramble">Trộn ngẫu nhiên</button>
+          <button id="btnClear" class="btn ghost" data-i18n="btn.clear">Xoá hết</button>
         </div>
 
-        <h2 style="margin-top:18px">2 · Cách giải</h2>
+        <h2 style="margin-top:18px" data-i18n="methodPanel.heading">2 · Cách giải</h2>
         <div class="method">
           <label class="radio">
             <input type="radio" name="method" value="kociemba" checked />
-            <span><b>Nhanh / ngắn gọn</b><small>Thuật toán Kociemba (~20 nước)</small></span>
+            <span><b data-i18n="method.kociemba.title">Nhanh / ngắn gọn</b><small data-i18n="method.kociemba.desc">Thuật toán Kociemba (~20 nước)</small></span>
           </label>
           <label class="radio">
             <input type="radio" name="method" value="lbl" />
-            <span><b>Người mới (từng tầng)</b><small>Có tên từng giai đoạn, dễ học</small></span>
+            <span><b data-i18n="method.lbl.title">Người mới (từng tầng)</b><small data-i18n="method.lbl.desc">Có tên từng giai đoạn, dễ học</small></span>
           </label>
         </div>
-        <button id="btnSolve" class="btn primary big">Giải khối này ▶</button>
+        <button id="btnSolve" class="btn primary big" data-i18n="btn.solve">Giải khối này ▶</button>
         <div id="msg" class="msg"></div>
       </div>
 
       <!-- Khung phát lại -->
       <div id="playPanel" class="card hidden">
         <div class="play-head">
-          <h2>Lời giải</h2>
-          <button id="btnEdit" class="btn ghost small">← Sửa màu</button>
+          <h2 data-i18n="playPanel.heading">Lời giải</h2>
+          <button id="btnEdit" class="btn ghost small" data-i18n="btn.edit">← Sửa màu</button>
         </div>
         <div id="solveInfo" class="muted"></div>
 
@@ -119,20 +120,32 @@
           <div class="counter"><span id="moveCounter">0 / 0</span></div>
           <div class="stage-label" id="stageLabel"></div>
           <div class="controls">
-            <button id="btnFirst" class="ctrl" title="Về đầu">⏮</button>
-            <button id="btnPrev" class="ctrl" title="Lùi">◀</button>
-            <button id="btnPlay" class="ctrl play" title="Chạy/Dừng">▶</button>
-            <button id="btnNext" class="ctrl" title="Tiến">▶|</button>
-            <button id="btnLast" class="ctrl" title="Tới cuối">⏭</button>
+            <button id="btnFirst" class="ctrl" data-i18n-title="control.first" title="Về đầu">⏮</button>
+            <button id="btnPrev" class="ctrl" data-i18n-title="control.prev" title="Lùi">◀</button>
+            <button id="btnPlay" class="ctrl play" data-i18n-title="control.playToggle" title="Chạy/Dừng">▶</button>
+            <button id="btnNext" class="ctrl" data-i18n-title="control.next" title="Tiến">▶|</button>
+            <button id="btnLast" class="ctrl" data-i18n-title="control.last" title="Tới cuối">⏭</button>
           </div>
           <div class="speed">
-            <span>Tốc độ</span>
+            <span data-i18n="speed.label">Tốc độ</span>
             <input id="speed" type="range" min="1" max="10" value="5" />
-            <button id="btnFast" class="btn ghost small">Giải nhanh ⏩</button>
+            <button id="btnFast" class="btn ghost small" data-i18n="btn.fast">Giải nhanh ⏩</button>
           </div>
         </div>
 
-        <div class="moves-title">Toàn bộ các bước</div>
+        <div class="moves-head">
+          <div class="moves-title" data-i18n="movesTitle">Toàn bộ các bước</div>
+          <button id="btnHelp" type="button" class="help-btn" data-i18n-title="help.toggle" title="Giải thích ký hiệu">?</button>
+        </div>
+        <div id="helpPanel" class="help-panel hidden">
+          <div class="help-row"><b>U</b><span data-i18n="help.U">Mặt trên</span></div>
+          <div class="help-row"><b>D</b><span data-i18n="help.D">Mặt dưới</span></div>
+          <div class="help-row"><b>F</b><span data-i18n="help.F">Mặt trước</span></div>
+          <div class="help-row"><b>B</b><span data-i18n="help.B">Mặt sau</span></div>
+          <div class="help-row"><b>R</b><span data-i18n="help.R">Mặt phải</span></div>
+          <div class="help-row"><b>L</b><span data-i18n="help.L">Mặt trái</span></div>
+          <div class="help-note" data-i18n="help.note">Xoay mặt đó 90° theo chiều kim đồng hồ (nhìn thẳng vào mặt). Thêm dấu ' = ngược chiều kim đồng hồ, thêm số 2 = xoay 180°.</div>
+        </div>
         <div id="movesList" class="moves"></div>
       </div>
     </aside>

@@ -11,7 +11,7 @@
  */
 import { Cube } from './cube';
 import { isFace, isMove } from './types';
-import type { Face, FaceletState, Move, SolveResult, SolveStage, Sticker, Vec3 } from './types';
+import type { Face, FaceletState, Move, SolveResult, SolveStage, StageKey, Sticker, Vec3 } from './types';
 
 type Goal = (state: FaceletState) => boolean;
 
@@ -178,7 +178,7 @@ function macroDfs(cube: Cube, goal: Goal, depth: number, macros: readonly Move[]
 // ================= bộ ghi =================
 
 interface SolveStageDraft {
-  name: string;
+  name: StageKey;
   moves: Move[];
 }
 
@@ -191,7 +191,7 @@ class Solver {
     this.cube = new Cube(state);
   }
 
-  stage(name: string): void {
+  stage(name: StageKey): void {
     this.current = { name, moves: [] };
     this.stages.push(this.current);
   }
@@ -209,7 +209,7 @@ class Solver {
 // ---------- STAGE: thập tự D ----------
 
 function doCross(s: Solver): void {
-  s.stage('Thập tự mặt đáy');
+  s.stage('cross');
   const solvedSlots: (readonly Sticker[])[] = [];
   for (const X of SIDES) {
     const home = homeGroupForColors(['D', X]);
@@ -262,7 +262,7 @@ function alignCornerOverSlot(s: Solver, colors: readonly Face[], front: Side): v
 }
 
 function doFirstLayerCorners(s: Solver): void {
-  s.stage('Góc tầng 1');
+  s.stage('f1Corners');
   for (const X of SIDES) {
     const colors: readonly Face[] = ['D', X, RIGHT[X]];
     const home = homeGroupForColors(colors);
@@ -319,7 +319,7 @@ function insertMiddleFromTop(s: Solver, colors: readonly Face[]): void {
 }
 
 function doMiddle(s: Solver): void {
-  s.stage('Tầng giữa');
+  s.stage('middleEdges');
   let guard = 0;
   while (guard++ < 30) {
     const unsolved = M_EDGES.find((g) => !solvedPiece(s.cube.state, g));
@@ -344,7 +344,7 @@ function doLastLayer(s: Solver): void {
   const U2: Move[] = ['U2'];
 
   // 1) định hướng cạnh -> thập tự mặt U
-  s.stage('Thập tự mặt trên');
+  s.stage('topCross');
   const crossGoal: Goal = (st) =>
     U_EDGES.every((g) => {
       const u = g.find((x) => x.face === 'U');
@@ -355,7 +355,7 @@ function doLastLayer(s: Solver): void {
   if (mv) s.push(mv);
 
   // 2) định hướng góc -> toàn mặt U
-  s.stage('Định hướng góc trên');
+  s.stage('topCornersOrient');
   const ollGoal: Goal = (st) =>
     U_CORNERS.every((g) => {
       const u = g.find((x) => x.face === 'U');
@@ -367,7 +367,7 @@ function doLastLayer(s: Solver): void {
   if (mv) s.push(mv);
 
   // 3) hoán vị cả tầng cuối -> xong
-  s.stage('Hoán vị tầng cuối');
+  s.stage('finalPermutation');
   const solvedGoal: Goal = (st) => new Cube(st).isSolved();
   const Aperm = Cube.parseMoves("R' F R' B2 R F' R' B2 R2");        // 3-cycle góc
   const Tperm = Cube.parseMoves("R U R' U' R' F R2 U' R' U' R U R' F'");

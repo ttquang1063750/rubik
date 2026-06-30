@@ -54,9 +54,19 @@ export interface MoveDefinition {
 /** Bảng hoán vị: PERMS[move][dest] = src — facelet đích lấy màu từ facelet nguồn. */
 export type PermutationTable = Readonly<Record<Move, readonly number[]>>;
 
+/** Khoá định danh giai đoạn — UI tự tra tên hiển thị theo ngôn ngữ, core không chứa text. */
+export type StageKey =
+  | 'kociembaOptimal'
+  | 'cross'
+  | 'f1Corners'
+  | 'middleEdges'
+  | 'topCross'
+  | 'topCornersOrient'
+  | 'finalPermutation';
+
 /** Một giai đoạn trong lời giải tầng-by-tầng, có tên để hiển thị cho người dùng. */
 export interface SolveStage {
-  readonly name: string;
+  readonly name: StageKey;
   readonly moves: Move[];
 }
 
