@@ -15,6 +15,12 @@
   touch-action: none;
   cursor: grab;
 
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+  }
+
   &:active {
     cursor: grabbing;
   }
@@ -26,4 +32,14 @@
   color: var(--muted);
   font-size: 13px;
   text-align: center;
+}
+
+@media (max-width: 900px) {
+  .stage {
+    position: static;
+    margin-bottom: 16px;
+  }
+  .cube3d {
+    height: 350px;
+  }
 }

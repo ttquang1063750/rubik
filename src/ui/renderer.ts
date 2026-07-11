@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { Cube } from '../core/cube';
 import { isFace } from '../core/types';
+import { InteractionManager } from './interaction';
 import type { Face, FaceletState, Move, Vec3 } from '../core/types';
 
 /** Giá trị 1 ô để hiển thị: 1 trong 6 mặt, hoặc '.' nếu chưa tô (chế độ nhập). */
@@ -78,15 +79,6 @@ interface PointerLike {
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
-function pointerXY(e: MouseEvent | TouchEvent): PointerLike {
-  if ('touches' in e) {
-    const t = e.touches[0];
-    if (!t) throw new Error('TouchEvent không có touch nào');
-    return t;
-  }
-  return e;
-}
-
 export class RubikRenderer {
   static readonly COLORS: Readonly<Record<Face, string>> = COLORS;
 
@@ -110,6 +102,7 @@ export class RubikRenderer {
   // vô hạn vòng theo mọi hướng, giống cầm khối thật xoay tự do trong tay.
   private orientation!: THREE.Quaternion;
   private radius!: number;
+  private interactionManager!: InteractionManager;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -146,7 +139,11 @@ export class RubikRenderer {
     this.world = new THREE.Group();
     this.scene.add(this.world);
 
-    window.addEventListener('resize', () => this.resize());
+    let resizeTimeout: number;
+    window.addEventListener('resize', () => {
+      window.clearTimeout(resizeTimeout);
+      resizeTimeout = window.setTimeout(() => this.resize(), 100);
+    });
   }
 
   /** Cập nhật vị trí + hướng camera từ orientation hiện tại (không gọi lookAt). */
@@ -268,55 +265,39 @@ export class RubikRenderer {
     requestAnimationFrame(step);
   }
 
-  // ================= tương tác chuột =================
+  // ================= tương tác chuột và touch =================
 
   private bindInput(): void {
     const el = this.glRenderer.domElement;
-    let dragging = false;
-    let moved = false;
-    let lastX = 0, lastY = 0, downX = 0, downY = 0;
-
-    const down = (e: MouseEvent | TouchEvent): void => {
-      const p = pointerXY(e);
-      dragging = true;
-      moved = false;
-      lastX = downX = p.clientX;
-      lastY = downY = p.clientY;
-    };
-
-    const move = (e: MouseEvent | TouchEvent): void => {
-      if (!dragging) return;
-      const p = pointerXY(e);
-      const dx = p.clientX - lastX;
-      const dy = p.clientY - lastY;
-      if (Math.abs(p.clientX - downX) + Math.abs(p.clientY - downY) > 6) moved = true;
-      // Trục "phải"/"lên" HIỆN TẠI của camera (lấy lại mỗi lần kéo) — xoay quanh
-      // 2 trục này luôn cho cảm giác đúng theo màn hình bất kể đã xoay bao nhiêu.
-      const currentRight = X_AXIS.clone().applyQuaternion(this.orientation);
-      const currentUp = Y_AXIS.clone().applyQuaternion(this.orientation);
-      const qYaw = new THREE.Quaternion().setFromAxisAngle(currentUp, -dx * 0.01);
-      const qPitch = new THREE.Quaternion().setFromAxisAngle(currentRight, -dy * 0.01);
-      this.orientation.premultiply(qYaw).premultiply(qPitch);
-      this.updateCameraPosition();
-      lastX = p.clientX;
-      lastY = p.clientY;
-      if (e.cancelable) e.preventDefault();
-    };
-
-    const up = (e: MouseEvent | TouchEvent): void => {
-      if (dragging && !moved && this.pickEnabled) {
-        const pointer: PointerLike = 'changedTouches' in e ? e.changedTouches[0] : e;
-        this.handlePick(pointer);
+    this.interactionManager = new InteractionManager(el, {
+      onYawPitch: (dx, dy) => {
+        const currentRight = X_AXIS.clone().applyQuaternion(this.orientation);
+        const currentUp = Y_AXIS.clone().applyQuaternion(this.orientation);
+        const qYaw = new THREE.Quaternion().setFromAxisAngle(currentUp, -dx * 0.008);
+        const qPitch = new THREE.Quaternion().setFromAxisAngle(currentRight, -dy * 0.008);
+        this.orientation.premultiply(qYaw).premultiply(qPitch);
+        this.updateCameraPosition();
+      },
+      onZoom: (factor) => {
+        this.radius = Math.max(4.0, Math.min(15.0, this.radius * factor));
+        this.updateCameraPosition();
+      },
+      onRoll: (deltaAngle) => {
+        const currentLook = new THREE.Vector3(0, 0, 1).applyQuaternion(this.orientation);
+        const qRoll = new THREE.Quaternion().setFromAxisAngle(currentLook, deltaAngle);
+        this.orientation.premultiply(qRoll);
+        this.updateCameraPosition();
+      },
+      onPick: (clientX, clientY) => {
+        if (this.pickEnabled) {
+          this.handlePick({ clientX, clientY });
+        }
       }
-      dragging = false;
-    };
+    });
+  }
 
-    el.addEventListener('mousedown', down);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-    el.addEventListener('touchstart', down, { passive: true });
-    el.addEventListener('touchmove', move, { passive: false });
-    el.addEventListener('touchend', up);
+  destroy(): void {
+    this.interactionManager.destroy();
   }
 
   private handlePick(ev: PointerLike): void {

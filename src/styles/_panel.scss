@@ -36,6 +36,8 @@
   margin-bottom: 14px;
 }
 .swatch {
+  width: 100%;
+  min-width: 0;
   aspect-ratio: 1;
   border-radius: 10px;
   border: 3px solid transparent;
