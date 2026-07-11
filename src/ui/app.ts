@@ -1,29 +1,49 @@
 /**
- * Kết nối UI: nhập màu trên khối 3D, kiểm tra hợp lệ, gọi bộ giải, phát lại.
+ * Kết nối UI: nhập màu trên khối 3D (3x3 hoặc Pyraminx), kiểm tra hợp lệ, gọi bộ giải, phát lại.
  */
 import type {} from '../../public/vendor/cube'; // chỉ để kéo theo khai báo global window.Cube
 import { Cube } from '../core/cube';
 import { solveLBL } from '../core/solver-lbl';
 import { RubikRenderer, assertFaceletState } from './renderer';
 import type { DisplayState } from './renderer';
+import { Pyraminx, solvePyraminx, inversePyraminxMove } from '../core/pyraminx-solver';
+import type { PyraminxState, PyraminxColor } from '../core/pyraminx-solver';
+import { PyraminxRenderer } from './pyraminx-renderer';
+import type { PyraminxDisplayState, PyraminxDisplayCell } from './pyraminx-renderer';
 import type { Face, FaceletState, Move, SolveStage, StageKey } from '../core/types';
 import { colorLabel, getLang, isI18nKey, setLang, stageLabel, t } from './i18n';
 import type { Lang } from './i18n';
 
-// ---- bảng màu: thứ tự đẹp mắt, kèm ký tự mặt ----
-const PALETTE: readonly Face[] = ['U', 'D', 'F', 'B', 'R', 'L'];
-const CENTERS: readonly number[] = [4, 13, 22, 31, 40, 49];
+// ---- Khai báo giao diện chung cho Renderer ----
+interface IRenderer {
+  setState(state: string[]): void;
+  animateMove(m: Move, ms: number, cb?: () => void): void;
+  destroy(): void;
+  pickEnabled: boolean;
+  onPick: ((i: number) => void) | null;
+  readonly animating: boolean;
+}
+
+// ---- bảng màu ----
+const PALETTE_3X3: readonly Face[] = ['U', 'D', 'F', 'B', 'R', 'L'];
+const PALETTE_PYRA: readonly string[] = ['R', 'G', 'Y', 'B'];
+const CENTERS_3X3: readonly number[] = [4, 13, 22, 31, 40, 49];
 
 // ---- trạng thái ----
-let state: DisplayState = Cube.solved().state;
-let selected: Face = 'U';
+let activeMode: '3x3' | 'pyraminx' = '3x3';
+let rubikState: DisplayState = Cube.solved().state;
+let pyraminxState: PyraminxDisplayState = Pyraminx.solved().state;
+
+let selectedColor: string = 'U'; // 'U' cho 3x3, 'R' cho Pyraminx
 let inputMode = true;
-let renderer: RubikRenderer;
+let activeRenderer!: IRenderer;
 
 // playback
 let stages: readonly SolveStage[] = [];
 let allMoves: readonly Move[] = [];
-let baseState: FaceletState | null = null;
+let baseState3x3: FaceletState | null = null;
+let baseStatePyra: PyraminxState | null = null;
+
 interface StageBound {
   readonly name: StageKey;
   readonly start: number;
@@ -52,35 +72,134 @@ function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+type MsgKind = '' | 'err' | 'ok' | 'info';
+function msg(text: string, kind: MsgKind): void {
+  const m = $('msg');
+  m.textContent = text;
+  m.className = 'msg ' + kind;
+}
+
 function init(): void {
-  renderer = new RubikRenderer($('cube3d'));
-  renderer.setState(state);
-  renderer.pickEnabled = true;
-  renderer.onPick = (i) => {
+  // Khởi tạo renderer mặc định (3x3)
+  const container = $('cube3d');
+  const rubik = new RubikRenderer(container);
+  rubik.setState(rubikState);
+  rubik.pickEnabled = true;
+  rubik.onPick = (i) => {
     if (!inputMode) return;
-    if (CENTERS.includes(i)) return; // không sửa ô tâm
-    state[i] = selected;
-    renderer.setState(state);
+    if (CENTERS_3X3.includes(i)) return; // không sửa ô tâm
+    rubikState[i] = selectedColor as Face;
+    activeRenderer.setState(rubikState);
   };
+  activeRenderer = rubik;
+
+  // Gắn sự kiện chuyển đổi chế độ
+  $('btnMode3x3').onclick = () => switchMode('3x3');
+  $('btnModePyraminx').onclick = () => switchMode('pyraminx');
+
   buildPalette();
+  renderMethodSelect();
   bindButtons();
+  applyTranslations();
+}
+
+function switchMode(mode: '3x3' | 'pyraminx'): void {
+  if (activeMode === mode) return;
+
+  stopPlay();
+  activeRenderer.destroy();
+
+  activeMode = mode;
+  inputMode = true;
+
+  // Cập nhật giao diện switcher
+  $('btnMode3x3').classList.toggle('active', mode === '3x3');
+  $('btnModePyraminx').classList.toggle('active', mode === 'pyraminx');
+
+  $('playPanel').classList.add('hidden');
+  $('inputPanel').classList.remove('hidden');
+
+  const container = $('cube3d');
+  if (mode === '3x3') {
+    selectedColor = 'U';
+    const rubik = new RubikRenderer(container);
+    rubik.setState(rubikState);
+    rubik.pickEnabled = true;
+    rubik.onPick = (i) => {
+      if (!inputMode) return;
+      if (CENTERS_3X3.includes(i)) return;
+      rubikState[i] = selectedColor as Face;
+      activeRenderer.setState(rubikState);
+    };
+    activeRenderer = rubik;
+  } else {
+    selectedColor = 'R';
+    const pyra = new PyraminxRenderer(container);
+    pyra.setState(pyraminxState);
+    pyra.pickEnabled = true;
+    pyra.onPick = (i) => {
+      if (!inputMode) return;
+      pyraminxState[i] = selectedColor as PyraminxDisplayCell;
+      activeRenderer.setState(pyraminxState);
+    };
+    activeRenderer = pyra;
+  }
+
+  buildPalette();
+  renderMethodSelect();
+  updateModeHint();
+  msg('', '');
   applyTranslations();
 }
 
 function buildPalette(): void {
   const pal = $('palette');
   pal.innerHTML = '';
-  for (const letter of PALETTE) {
+  const currentPalette = activeMode === '3x3' ? PALETTE_3X3 : PALETTE_PYRA;
+
+  for (const letter of currentPalette) {
     const sw = document.createElement('div');
-    sw.className = 'swatch' + (letter === selected ? ' active' : '');
-    sw.style.background = RubikRenderer.COLORS[letter];
-    sw.title = colorLabel(letter);
+    sw.className = 'swatch' + (letter === selectedColor ? ' active' : '');
+    
+    if (activeMode === '3x3') {
+      sw.style.background = RubikRenderer.COLORS[letter as Face];
+      sw.title = colorLabel(letter as Face);
+    } else {
+      sw.style.background = PyraminxRenderer.COLORS[letter as Exclude<PyraminxDisplayCell, '.'>];
+      sw.title = colorLabel(letter as 'Y' | 'G' | 'R' | 'B');
+    }
+
     sw.onclick = () => {
-      selected = letter;
+      selectedColor = letter;
       Array.from(pal.children).forEach((c) => c.classList.remove('active'));
       sw.classList.add('active');
     };
     pal.appendChild(sw);
+  }
+}
+
+function renderMethodSelect(): void {
+  const wrap = $('methodSelect');
+  wrap.innerHTML = '';
+
+  if (activeMode === '3x3') {
+    wrap.innerHTML = `
+      <label class="radio">
+        <input type="radio" name="method" value="kociemba" checked />
+        <span><b data-i18n="method.kociemba.title">${t('method.kociemba.title')}</b><small data-i18n="method.kociemba.desc">${t('method.kociemba.desc')}</small></span>
+      </label>
+      <label class="radio">
+        <input type="radio" name="method" value="lbl" />
+        <span><b data-i18n="method.lbl.title">${t('method.lbl.title')}</b><small data-i18n="method.lbl.desc">${t('method.lbl.desc')}</small></span>
+      </label>
+    `;
+  } else {
+    wrap.innerHTML = `
+      <label class="radio">
+        <input type="radio" name="method" value="pyraminx" checked />
+        <span><b data-i18n="method.pyraminx.title">${t('method.pyraminx.title')}</b><small data-i18n="method.pyraminx.desc">${t('method.pyraminx.desc')}</small></span>
+      </label>
+    `;
   }
 }
 
@@ -111,22 +230,48 @@ function updateModeHint(): void {
 function switchLang(lang: Lang): void {
   setLang(lang);
   buildPalette();
+  renderMethodSelect();
   applyTranslations();
 }
 
 function bindButtons(): void {
-  $('btnSolved').onclick = () => { setState(Cube.solved().state); msg('', ''); };
+  $('btnSolved').onclick = () => {
+    if (activeMode === '3x3') {
+      rubikState = Cube.solved().state;
+      activeRenderer.setState(rubikState);
+    } else {
+      pyraminxState = Pyraminx.solved().state;
+      activeRenderer.setState(pyraminxState);
+    }
+    msg('', '');
+  };
+
   $('btnClear').onclick = () => {
-    const s: DisplayState = new Array(54).fill('.');
-    (['U', 'R', 'F', 'D', 'L', 'B'] as const).forEach((f, k) => { s[CENTERS[k]] = f; });
-    setState(s);
+    if (activeMode === '3x3') {
+      const s: DisplayState = new Array(54).fill('.');
+      CENTERS_3X3.forEach((centerIndex, k) => { s[centerIndex] = PALETTE_3X3[k]; });
+      rubikState = s;
+      activeRenderer.setState(rubikState);
+    } else {
+      pyraminxState = new Array<PyraminxDisplayCell>(36).fill('.');
+      activeRenderer.setState(pyraminxState);
+    }
     msg(t('msg.cleared'), 'info');
   };
+
   $('btnScramble').onclick = () => {
-    const seq = randomScramble(25);
-    setState(Cube.solved().apply(seq).state);
+    if (activeMode === '3x3') {
+      const seq = randomScramble(25);
+      rubikState = Cube.solved().apply(seq).state;
+      activeRenderer.setState(rubikState);
+    } else {
+      const seq = randomPyraminxScramble(12);
+      pyraminxState = Pyraminx.solved().apply(seq).state;
+      activeRenderer.setState(pyraminxState);
+    }
     msg(t('msg.scrambled'), 'info');
   };
+
   $('btnSolve').onclick = onSolve;
   $('btnEdit').onclick = backToEdit;
 
@@ -141,21 +286,9 @@ function bindButtons(): void {
 
   const speedInput = $input('speed');
   speedInput.oninput = () => {
-    durBase = 620 - (Number(speedInput.value) - 1) * 60; // 1->620ms, 10->80ms
+    durBase = 620 - (Number(speedInput.value) - 1) * 60;
   };
   durBase = 620 - 4 * 60;
-}
-
-function setState(s: DisplayState): void {
-  state = s.slice();
-  renderer.setState(state);
-}
-
-type MsgKind = '' | 'err' | 'ok' | 'info';
-function msg(text: string, kind: MsgKind): void {
-  const m = $('msg');
-  m.textContent = text;
-  m.className = 'msg ' + kind;
 }
 
 function randomScramble(n: number): string {
@@ -165,6 +298,26 @@ function randomScramble(n: number): string {
   for (let i = 0; i < n; i++) {
     out.push(faces[(Math.random() * 6) | 0] + mods[(Math.random() * 3) | 0]);
   }
+  return out.join(' ');
+}
+
+function randomPyraminxScramble(n: number): string {
+  const bigMoves = ['U', 'L', 'R', 'B'];
+  const smallMoves = ['u', 'l', 'r', 'b'];
+  const mods = ['', "'"];
+  const out: string[] = [];
+  let last = '';
+  for (let i = 0; i < n; i++) {
+    let f = bigMoves[Math.floor(Math.random() * 4)];
+    while (f === last) f = bigMoves[Math.floor(Math.random() * 4)];
+    out.push(f + mods[Math.floor(Math.random() * 2)]);
+    last = f;
+  }
+  smallMoves.forEach((s) => {
+    if (Math.random() < 0.6) {
+      out.push(s + mods[Math.floor(Math.random() * 2)]);
+    }
+  });
   return out.join(' ');
 }
 
@@ -193,7 +346,7 @@ function parity(arr: readonly number[]): number {
   return p % 2;
 }
 
-function validate(facelet: string): ValidationResult {
+function validate3x3(facelet: string): ValidationResult {
   const counts: Partial<Record<string, number>> = {};
   for (let i = 0; i < 54; i++) {
     const ch = facelet[i];
@@ -222,38 +375,70 @@ function validate(facelet: string): ValidationResult {
   }
 }
 
+function validatePyraminx(stateStr: string): ValidationResult {
+  const counts: Partial<Record<string, number>> = {};
+  for (let i = 0; i < 36; i++) {
+    const ch = stateStr[i];
+    counts[ch] = (counts[ch] ?? 0) + 1;
+  }
+  const emptyCount = counts['.'] ?? 0;
+  if (emptyCount > 0) return { ok: false, error: t('err.emptyTilesTpl', emptyCount) };
+
+  const colors = ['Y', 'R', 'G', 'B'];
+  const bad = colors.filter((c) => counts[c] !== 9);
+  if (bad.length > 0) {
+    return { ok: false, error: t('err.wrongCountTpl', bad.join(', ')) };
+  }
+
+  return { ok: true };
+}
+
 // ================= giải =================
 
-function selectedMethod(): 'kociemba' | 'lbl' {
+function selectedMethod(): 'kociemba' | 'lbl' | 'pyraminx' {
   const el = document.querySelector<HTMLInputElement>('input[name="method"]:checked');
   if (!el) throw new Error('Không tìm thấy lựa chọn phương pháp giải');
-  return el.value === 'lbl' ? 'lbl' : 'kociemba';
+  return el.value as 'kociemba' | 'lbl' | 'pyraminx';
 }
 
 function onSolve(): void {
-  const facelet = state.join('');
-  const v = validate(facelet);
-  if (!v.ok) { msg('⚠️ ' + v.error, 'err'); return; }
-  const method = selectedMethod();
+  if (activeMode === '3x3') {
+    const facelet = rubikState.join('');
+    const v = validate3x3(facelet);
+    if (!v.ok) { msg('⚠️ ' + v.error, 'err'); return; }
+    const method = selectedMethod();
 
-  if (method === 'kociemba') {
-    msg(t('msg.preparingSolver'), 'info');
-    // initSolver nặng -> chạy sau 1 nhịp để UI kịp hiện thông báo
-    setTimeout(() => {
+    if (method === 'kociemba') {
+      msg(t('msg.preparingSolver'), 'info');
+      setTimeout(() => {
+        try {
+          if (!solverReady) { window.Cube.initSolver(); solverReady = true; }
+          const sol = window.Cube.fromString(facelet).solve();
+          const moves = Cube.simplify(sol);
+          startPlayback([{ name: 'kociembaOptimal', moves }], moves, 'kociemba');
+        } catch (e) {
+          msg(t('msg.solveFailedPrefix') + errorMessage(e), 'err');
+        }
+      }, 30);
+    } else {
       try {
-        if (!solverReady) { window.Cube.initSolver(); solverReady = true; }
-        const sol = window.Cube.fromString(facelet).solve();
-        const moves = Cube.simplify(sol);
-        startPlayback([{ name: 'kociembaOptimal', moves }], moves, 'kociemba');
+        const res = solveLBL(assertFaceletState(rubikState));
+        if (!res.solved) { msg(t('msg.lblInternalError'), 'err'); return; }
+        startPlayback(res.stages, res.moves, 'lbl');
       } catch (e) {
         msg(t('msg.solveFailedPrefix') + errorMessage(e), 'err');
       }
-    }, 30);
+    }
   } else {
+    // Giải Pyraminx
+    const stateStr = pyraminxState.join('');
+    const v = validatePyraminx(stateStr);
+    if (!v.ok) { msg('⚠️ ' + v.error, 'err'); return; }
+
     try {
-      const res = solveLBL(assertFaceletState(state));
-      if (!res.solved) { msg(t('msg.lblInternalError'), 'err'); return; }
-      startPlayback(res.stages, res.moves, 'lbl');
+      const res = solvePyraminx(pyraminxState as PyraminxColor[]);
+      if (!res.solved) { msg('⚠️ Lỗi không thể giải.', 'err'); return; }
+      startPlayback(res.stages, res.moves, 'pyraminx');
     } catch (e) {
       msg(t('msg.solveFailedPrefix') + errorMessage(e), 'err');
     }
@@ -262,14 +447,19 @@ function onSolve(): void {
 
 // ================= phát lại =================
 
-type SolveMethod = 'kociemba' | 'lbl';
+type SolveMethod = 'kociemba' | 'lbl' | 'pyraminx';
 let lastSolveMethod: SolveMethod | null = null;
 
 function startPlayback(stg: readonly SolveStage[], moves: readonly Move[], method: SolveMethod): void {
   stages = stg;
   allMoves = moves;
   lastSolveMethod = method;
-  baseState = assertFaceletState(state);
+  
+  if (activeMode === '3x3') {
+    baseState3x3 = assertFaceletState(rubikState);
+  } else {
+    baseStatePyra = pyraminxState.slice() as PyraminxColor[];
+  }
   idx = 0;
 
   stageBounds = [];
@@ -280,7 +470,7 @@ function startPlayback(stg: readonly SolveStage[], moves: readonly Move[], metho
   }
 
   inputMode = false;
-  renderer.pickEnabled = false;
+  activeRenderer.pickEnabled = false;
   $('inputPanel').classList.add('hidden');
   $('playPanel').classList.remove('hidden');
   updateSolveInfo();
@@ -292,16 +482,26 @@ function startPlayback(stg: readonly SolveStage[], moves: readonly Move[], metho
 
 function updateSolveInfo(): void {
   if (!lastSolveMethod) return;
-  $('solveInfo').textContent = lastSolveMethod === 'kociemba'
-    ? t('solveInfo.kociembaTpl', allMoves.length)
-    : t('solveInfo.lblTpl', allMoves.length, stages.length);
+  if (lastSolveMethod === 'kociemba') {
+    $('solveInfo').textContent = t('solveInfo.kociembaTpl', allMoves.length);
+  } else if (lastSolveMethod === 'lbl') {
+    $('solveInfo').textContent = t('solveInfo.lblTpl', allMoves.length, stages.length);
+  } else {
+    $('solveInfo').textContent = t('solveInfo.pyraminxTpl', allMoves.length);
+  }
 }
 
 function backToEdit(): void {
   stopPlay();
   inputMode = true;
-  renderer.pickEnabled = true;
-  renderer.setState(state); // giữ nguyên màu đã nhập
+  activeRenderer.pickEnabled = true;
+  
+  if (activeMode === '3x3') {
+    activeRenderer.setState(rubikState);
+  } else {
+    activeRenderer.setState(pyraminxState);
+  }
+  
   $('playPanel').classList.add('hidden');
   $('inputPanel').classList.remove('hidden');
   updateModeHint();
@@ -340,7 +540,6 @@ function renderMovesList(): void {
 
 function updateUI(): void {
   $('moveCounter').textContent = `${idx} / ${allMoves.length}`;
-  // giai đoạn hiện tại: tìm giai đoạn chứa nước sắp đi (idx)
   let label = '';
   for (const b of stageBounds) {
     if (idx >= b.start && idx < b.end) { label = stageLabel(b.name); break; }
@@ -358,24 +557,39 @@ function updateUI(): void {
 
 /** nhảy tức thời tới vị trí k (0..N) */
 function seek(k: number): void {
-  if (!baseState) return;
   idx = Math.max(0, Math.min(allMoves.length, k));
-  const c = new Cube(baseState);
-  c.apply(allMoves.slice(0, idx));
-  renderer.setState(c.state);
+  if (activeMode === '3x3') {
+    if (!baseState3x3) return;
+    const c = new Cube(baseState3x3);
+    c.apply(allMoves.slice(0, idx));
+    activeRenderer.setState(c.state);
+  } else {
+    if (!baseStatePyra) return;
+    const c = new Pyraminx(baseStatePyra);
+    const resCube = c.apply(allMoves.slice(0, idx).join(' '));
+    activeRenderer.setState(resCube.state);
+  }
   updateUI();
 }
 
 function stepNext(cb?: () => void): void {
-  if (idx >= allMoves.length || renderer.animating) { cb?.(); return; }
+  if (idx >= allMoves.length || activeRenderer.animating) { cb?.(); return; }
   const m = allMoves[idx];
-  renderer.animateMove(m, durBase, () => { idx++; updateUI(); cb?.(); });
+  activeRenderer.animateMove(m, durBase, () => { idx++; updateUI(); cb?.(); });
 }
 
+
 function stepPrev(): void {
-  if (idx <= 0 || renderer.animating) return;
-  const m = Cube.invertSeq([allMoves[idx - 1]])[0];
-  renderer.animateMove(m, durBase, () => { idx--; updateUI(); });
+  if (idx <= 0 || activeRenderer.animating) return;
+  
+  let invM: Move;
+  if (activeMode === '3x3') {
+    invM = Cube.invertSeq([allMoves[idx - 1]])[0];
+  } else {
+    invM = inversePyraminxMove(allMoves[idx - 1]);
+  }
+  
+  activeRenderer.animateMove(invM, durBase, () => { idx--; updateUI(); });
 }
 
 function startPlay(fast = false): void {
@@ -385,8 +599,8 @@ function startPlay(fast = false): void {
   const loop = (): void => {
     if (!playing || idx >= allMoves.length) { playing = false; updateUI(); return; }
     const m = allMoves[idx];
-    const d = fast ? 90 : durBase; // đọc lại mỗi nước để kéo "Tốc độ" có tác dụng ngay khi đang chạy
-    renderer.animateMove(m, d, () => { idx++; updateUI(); if (playing) loop(); });
+    const d = fast ? 90 : durBase;
+    activeRenderer.animateMove(m, d, () => { idx++; updateUI(); if (playing) loop(); });
   };
   loop();
 }

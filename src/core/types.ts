@@ -15,10 +15,12 @@ export function isFace(value: string): value is Face {
 
 export type Axis = 'x' | 'y' | 'z';
 
-/** Một trong 18 nước đi hợp lệ: U, U', U2, R, R', R2, ... */
-export type Move = `${Face}` | `${Face}'` | `${Face}2`;
+export type PyraminxMove = 'u' | "u'" | 'l' | "l'" | 'r' | "r'" | 'b' | "b'";
 
-const MOVE_PATTERN = /^[URFDLB](2|')?$/;
+/** Một trong 18 nước đi hợp lệ hoặc nước đi chóp Pyraminx. */
+export type Move = `${Face}` | `${Face}'` | `${Face}2` | PyraminxMove;
+
+const MOVE_PATTERN = /^([URFDLB](2|')?|[ulrb]'?)$/;
 
 /** Type guard: kiểm tra một chuỗi bất kỳ có phải nước đi hợp lệ. */
 export function isMove(value: string): value is Move {
@@ -62,7 +64,10 @@ export type StageKey =
   | 'middleEdges'
   | 'topCross'
   | 'topCornersOrient'
-  | 'finalPermutation';
+  | 'finalPermutation'
+  | 'tips'
+  | 'centers'
+  | 'edges';
 
 /** Một giai đoạn trong lời giải tầng-by-tầng, có tên để hiển thị cho người dùng. */
 export interface SolveStage {

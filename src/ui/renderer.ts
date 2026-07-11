@@ -298,6 +298,7 @@ export class RubikRenderer {
 
   destroy(): void {
     this.interactionManager.destroy();
+    this.container.removeChild(this.glRenderer.domElement);
   }
 
   private handlePick(ev: PointerLike): void {

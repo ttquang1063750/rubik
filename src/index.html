@@ -3,42 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rubik Solver — Nhập màu & xem cách giải khối Rubik 3x3 online</title>
-  <meta name="description" content="Giải khối Rubik 3x3 online. Nhập màu trên mô hình 3D tương tác, chọn cách giải (Kociemba hoặc từng tầng), xem lời giải từng bước. Dùng ngay, không cần cài đặt." />
-  <meta name="keywords" content="rubik, solver, giải rubik, khối rubik, rubik 3x3, kociemba, lớp-lớp, tầng-tầng, online tool" />
-  <meta name="author" content="Rubik Solver" />
+  <title>Rubik & Pyraminx Solver — Nhập màu & giải online trên mô hình 3D</title>
+  <meta name="description" content="Giải khối Rubik 3x3 và Pyraminx (Rubik Kim tự tháp) online. Nhập màu trên mô hình 3D tương tác, xem hướng dẫn giải từng tầng chi tiết hoặc tìm lời giải tối ưu ngắn nhất." />
+  <meta name="keywords" content="rubik, solver, giải rubik, khối rubik, rubik 3x3, pyraminx, giải pyraminx, rubik kim tự tháp, kociemba, bfs tối ưu, online tool" />
+  <meta name="author" content="Rubik & Pyraminx Solver" />
   <meta name="theme-color" content="#0e1116" />
-
+ 
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="shortcut icon" href="favicon.svg" />
   <link rel="apple-touch-icon" href="favicon.svg" />
-
+ 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://rubik.js-tools.org/" />
-  <meta property="og:title" content="Rubik Solver — Giải khối Rubik 3x3 online" />
-  <meta property="og:description" content="Nhập màu khối Rubik trên mô hình 3D, xem cách giải từng bước. Hỗ trợ 2 phương pháp: Kociemba (nhanh) & Người mới (chi tiết)." />
+  <meta property="og:title" content="Rubik & Pyraminx Solver — Giải online trên mô hình 3D" />
+  <meta property="og:description" content="Nhập màu và xem hướng dẫn giải khối Rubik 3x3 (Kociemba, từng tầng LBL) hoặc Pyraminx (Rubik Kim tự tháp) tối ưu ngay trên trình duyệt." />
   <meta property="og:image" content="https://rubik.js-tools.org/og-image.svg" />
   <meta property="og:locale" content="vi_VN" />
-
+ 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:url" content="https://rubik.js-tools.org/" />
-  <meta name="twitter:title" content="Rubik Solver — Giải khối Rubik 3x3 online" />
-  <meta name="twitter:description" content="Nhập màu khối Rubik, xem cách giải từng bước. Thuật toán Kociemba hoặc phương pháp tầng-by-tầng." />
+  <meta name="twitter:title" content="Rubik & Pyraminx Solver — Giải online trên mô hình 3D" />
+  <meta name="twitter:description" content="Giải khối Rubik 3x3 và Pyraminx (Rubik Kim tự tháp) online. Nhập màu trên mô hình 3D và xem lời giải từng bước cực nhanh." />
   <meta name="twitter:image" content="https://rubik.js-tools.org/og-image.svg" />
-
+ 
   <!-- Canonical -->
   <link rel="canonical" href="https://rubik.js-tools.org/" />
-
+ 
   <!-- Structured Data (JSON-LD) -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    "name": "Rubik Solver",
-    "description": "Công cụ giải khối Rubik 3x3 online với mô hình 3D tương tác",
+    "name": "Rubik & Pyraminx Solver",
+    "description": "Công cụ giải khối Rubik 3x3 và Pyraminx (Rubik Kim tự tháp) online với mô hình 3D tương tác",
     "url": "https://rubik.js-tools.org/",
     "applicationCategory": "UtilitiesApplication",
     "offers": {
@@ -48,7 +48,7 @@
     },
     "author": {
       "@type": "Organization",
-      "name": "Rubik Solver"
+      "name": "Rubik & Pyraminx Solver"
     },
     "inLanguage": "vi-VN",
     "browserRequirements": "Requires JavaScript"
@@ -61,6 +61,10 @@
   <header class="top-bar">
     <div class="top-bar-left">
       <h1 class="top-bar-title">🧩 Rubik Solver</h1>
+      <div class="mode-select">
+        <button id="btnMode3x3" type="button" class="mode-btn active" data-i18n="mode.3x3">Khối 3x3</button>
+        <button id="btnModePyraminx" type="button" class="mode-btn" data-i18n="mode.pyraminx">Pyraminx</button>
+      </div>
     </div>
     <div class="top-bar-right">
       <a href="https://js-tools.org/" target="_blank" rel="noopener" class="top-bar-link"><span data-i18n="topBar.otherApps">Other apps</span> <svg style="width: 14px; height: 14px; vertical-align: -2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>
@@ -94,15 +98,8 @@
         </div>
 
         <h2 style="margin-top:18px" data-i18n="methodPanel.heading">2 · Cách giải</h2>
-        <div class="method">
-          <label class="radio">
-            <input type="radio" name="method" value="kociemba" checked />
-            <span><b data-i18n="method.kociemba.title">Nhanh / ngắn gọn</b><small data-i18n="method.kociemba.desc">Thuật toán Kociemba (~20 nước)</small></span>
-          </label>
-          <label class="radio">
-            <input type="radio" name="method" value="lbl" />
-            <span><b data-i18n="method.lbl.title">Người mới (từng tầng)</b><small data-i18n="method.lbl.desc">Có tên từng giai đoạn, dễ học</small></span>
-          </label>
+        <div id="methodSelect" class="method">
+          <!-- Rendered dynamically by JS -->
         </div>
         <button id="btnSolve" class="btn primary big" data-i18n="btn.solve">Giải khối này ▶</button>
         <div id="msg" class="msg"></div>

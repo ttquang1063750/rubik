@@ -21,11 +21,15 @@ type Key =
   | 'btn.solve'
   | 'btn.edit'
   | 'btn.fast'
+  | 'mode.3x3'
+  | 'mode.pyraminx'
   | 'methodPanel.heading'
   | 'method.kociemba.title'
   | 'method.kociemba.desc'
   | 'method.lbl.title'
   | 'method.lbl.desc'
+  | 'method.pyraminx.title'
+  | 'method.pyraminx.desc'
   | 'playPanel.heading'
   | 'control.first'
   | 'control.prev'
@@ -55,6 +59,9 @@ type Key =
   | 'stage.topCross'
   | 'stage.topCornersOrient'
   | 'stage.finalPermutation'
+  | 'stage.tips'
+  | 'stage.centers'
+  | 'stage.edges'
   | 'msg.cleared'
   | 'msg.scrambled'
   | 'msg.preparingSolver'
@@ -69,7 +76,8 @@ type Key =
   | 'err.emptyTilesTpl'
   | 'err.wrongCountTpl'
   | 'solveInfo.kociembaTpl'
-  | 'solveInfo.lblTpl';
+  | 'solveInfo.lblTpl'
+  | 'solveInfo.pyraminxTpl';
 
 const VI: Readonly<Record<Key, string>> = {
   'topBar.otherApps': 'Ứng dụng khác',
@@ -86,11 +94,15 @@ const VI: Readonly<Record<Key, string>> = {
   'btn.solve': 'Giải khối này ▶',
   'btn.edit': '← Sửa màu',
   'btn.fast': 'Giải nhanh ⏩',
+  'mode.3x3': 'Khối 3x3',
+  'mode.pyraminx': 'Kim tự tháp (Pyraminx)',
   'methodPanel.heading': '2 · Cách giải',
   'method.kociemba.title': 'Nhanh / ngắn gọn',
   'method.kociemba.desc': 'Thuật toán Kociemba (~20 nước)',
   'method.lbl.title': 'Người mới (từng tầng)',
   'method.lbl.desc': 'Có tên từng giai đoạn, dễ học',
+  'method.pyraminx.title': 'Tối ưu / Ngắn nhất',
+  'method.pyraminx.desc': 'BFS hai đầu tìm lời giải tối ưu',
   'playPanel.heading': 'Lời giải',
   'control.first': 'Về đầu',
   'control.prev': 'Lùi',
@@ -120,6 +132,9 @@ const VI: Readonly<Record<Key, string>> = {
   'stage.topCross': 'Thập tự mặt trên',
   'stage.topCornersOrient': 'Định hướng góc trên',
   'stage.finalPermutation': 'Hoán vị tầng cuối',
+  'stage.tips': 'Giải chóp đỉnh',
+  'stage.centers': 'Giải góc chính (tâm)',
+  'stage.edges': 'Giải cạnh',
   'msg.cleared': 'Đã xoá. Hãy tô lại các ô theo khối của bạn.',
   'msg.scrambled': 'Đã trộn ngẫu nhiên 25 nước.',
   'msg.preparingSolver': '⏳ Đang chuẩn bị bộ giải nhanh…',
@@ -134,7 +149,8 @@ const VI: Readonly<Record<Key, string>> = {
   'err.emptyTilesTpl': 'Còn {0} ô chưa tô màu.',
   'err.wrongCountTpl': 'Mỗi màu phải đúng 9 ô. Sai ở: {0}.',
   'solveInfo.kociembaTpl': '{0} nước · thuật toán Kociemba',
-  'solveInfo.lblTpl': '{0} nước · {1} giai đoạn'
+  'solveInfo.lblTpl': '{0} nước · {1} giai đoạn',
+  'solveInfo.pyraminxTpl': '{0} nước · lời giải tối ưu Pyraminx'
 };
 
 const EN: Readonly<Record<Key, string>> = {
@@ -152,11 +168,15 @@ const EN: Readonly<Record<Key, string>> = {
   'btn.solve': 'Solve this cube ▶',
   'btn.edit': '← Edit colors',
   'btn.fast': 'Fast-solve ⏩',
+  'mode.3x3': '3x3x3 Cube',
+  'mode.pyraminx': 'Pyraminx',
   'methodPanel.heading': '2 · Solving method',
   'method.kociemba.title': 'Fast / short',
   'method.kociemba.desc': 'Kociemba algorithm (~20 moves)',
   'method.lbl.title': 'Beginner (layer by layer)',
   'method.lbl.desc': 'Named stages, easy to learn',
+  'method.pyraminx.title': 'Optimal / Shortest',
+  'method.pyraminx.desc': 'Bidirectional BFS optimal solver',
   'playPanel.heading': 'Solution',
   'control.first': 'First',
   'control.prev': 'Previous',
@@ -186,6 +206,9 @@ const EN: Readonly<Record<Key, string>> = {
   'stage.topCross': 'Top cross',
   'stage.topCornersOrient': 'Orient top corners',
   'stage.finalPermutation': 'Permute last layer',
+  'stage.tips': 'Solve tips',
+  'stage.centers': 'Solve centers (axial corners)',
+  'stage.edges': 'Solve edges',
   'msg.cleared': 'Cleared. Repaint the tiles to match your cube.',
   'msg.scrambled': 'Scrambled with 25 random moves.',
   'msg.preparingSolver': '⏳ Preparing the fast solver…',
@@ -200,7 +223,8 @@ const EN: Readonly<Record<Key, string>> = {
   'err.emptyTilesTpl': '{0} tiles still unpainted.',
   'err.wrongCountTpl': 'Each color must have exactly 9 tiles. Wrong: {0}.',
   'solveInfo.kociembaTpl': '{0} moves · Kociemba algorithm',
-  'solveInfo.lblTpl': '{0} moves · {1} stages'
+  'solveInfo.lblTpl': '{0} moves · {1} stages',
+  'solveInfo.pyraminxTpl': '{0} moves · Pyraminx optimal solver'
 };
 
 const DICTS: Readonly<Record<Lang, Readonly<Record<Key, string>>>> = { vi: VI, en: EN };
@@ -241,22 +265,27 @@ const STAGE_LABEL_KEY: Readonly<Record<StageKey, Key>> = {
   middleEdges: 'stage.middleEdges',
   topCross: 'stage.topCross',
   topCornersOrient: 'stage.topCornersOrient',
-  finalPermutation: 'stage.finalPermutation'
+  finalPermutation: 'stage.finalPermutation',
+  tips: 'stage.tips',
+  centers: 'stage.centers',
+  edges: 'stage.edges'
 };
 
 export function stageLabel(stage: StageKey): string {
   return t(STAGE_LABEL_KEY[stage]);
 }
 
-const COLOR_LABEL_KEY: Readonly<Record<Face, Key>> = {
+const COLOR_LABEL_KEY: Readonly<Record<Face | 'Y' | 'G', Key>> = {
   U: 'color.U',
   D: 'color.D',
   F: 'color.F',
   B: 'color.B',
   R: 'color.R',
-  L: 'color.L'
+  L: 'color.L',
+  Y: 'color.D',
+  G: 'color.F'
 };
 
-export function colorLabel(face: Face): string {
+export function colorLabel(face: Face | 'Y' | 'G'): string {
   return t(COLOR_LABEL_KEY[face]);
 }
